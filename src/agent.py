@@ -6,8 +6,8 @@ Implements a state graph with Router → Retriever → Grader → Generator flow
 import os
 from typing import TypedDict, List, Annotated
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import Document
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.documents import Document
+from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
 
@@ -39,7 +39,7 @@ class CodebaseAgent:
         # Initialize Gemini LLM
         llm_config = self.config.get('llm', {})
         self.llm = ChatGoogleGenerativeAI(
-            model=llm_config.get('model', 'gemini-2.5-pro'),
+            model=llm_config.get('model', 'gemini-2.5-flash'),
             temperature=llm_config.get('temperature', 0.1),
             google_api_key=os.getenv('GOOGLE_API_KEY'),
         )
