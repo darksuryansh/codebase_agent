@@ -6,11 +6,63 @@ Uses HuggingFace jina-embeddings-v2-base-code for semantic code search.
 import os
 import pickle
 from typing import List, Dict, Optional
-from langchain.schema import Document
+from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_core.embeddings import Embeddings
+from sentence_transformers import SentenceTransformer
 
 from utils import load_config
+
+
+class CustomHuggingFaceEmbeddings(Embeddings):
+    """Custom embeddings wrapper using sentence_transformers directly.
+    
+    This avoids the TensorFlow DLL loading issues with langchain_huggingface.
+    """
+    
+    def __init__(self, model_name: str, device: str = 'cpu'):
+        """Initialize the embeddings model.
+        
+        Args:
+            model_name: Name of the HuggingFace model to use
+            device: Device to run on ('cpu' or 'cuda')
+        """
+        print(f"📦 Loading embeddings model: {model_name}")
+        self.model = SentenceTransformer(model_name, device=device)
+    
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Embed a list of documents.
+        
+        Args:
+            texts: List of text documents to embed
+            
+        Returns:
+            List of embeddings (one per document)
+        """
+        embeddings = self.model.encode(
+            texts, 
+            convert_to_tensor=False, 
+            show_progress_bar=False,
+            normalize_embeddings=True
+        )
+        return embeddings.tolist()
+    
+    def embed_query(self, text: str) -> List[float]:
+        """Embed a single query text.
+        
+        Args:
+            text: Query text to embed
+            
+        Returns:
+            Embedding vector
+        """
+        embedding = self.model.encode(
+            [text], 
+            convert_to_tensor=False, 
+            show_progress_bar=False,
+            normalize_embeddings=True
+        )
+        return embedding[0].tolist()
 
 
 class VectorStore:
@@ -39,13 +91,10 @@ class VectorStore:
         model_name = embeddings_config.get('model', 'jinaai/jina-embeddings-v2-base-code')
         device = embeddings_config.get('device', 'cpu')
         
-        print(f"📦 Loading embeddings model: {model_name}")
-        
-        # Using HuggingFace embeddings with code-specific model
-        embeddings = HuggingFaceEmbeddings(
+        # Using custom wrapper to avoid TensorFlow DLL issues
+        embeddings = CustomHuggingFaceEmbeddings(
             model_name=model_name,
-            model_kwargs={'device': device},
-            encode_kwargs={'normalize_embeddings': True}
+            device=device
         )
         
         return embeddings
