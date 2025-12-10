@@ -13,8 +13,8 @@ from tqdm import tqdm
 from git import Repo
 from urllib.parse import urlparse
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.schema import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 from langchain_community.document_loaders import TextLoader
 
 from utils import (
@@ -65,12 +65,28 @@ class CodebaseIngestor:
         """Clean up temporary cloned repository."""
         if self.temp_clone_dir and os.path.exists(self.temp_clone_dir):
             print(f"🧹 Cleaning up temporary clone...")
-            shutil.rmtree(self.temp_clone_dir)
-            self.temp_clone_dir = None
+            try:
+                # On Windows, need to handle read-only files
+                def handle_remove_readonly(func, path, exc):
+                    """Error handler for Windows readonly file removal."""
+                    import stat
+                    if not os.access(path, os.W_OK):
+                        os.chmod(path, stat.S_IWUSR)
+                        func(path)
+                    else:
+                        raise
+                
+                shutil.rmtree(self.temp_clone_dir, onerror=handle_remove_readonly)
+                print("✅ Cleanup complete")
+            except Exception as e:
+                print(f"⚠️  Could not fully clean up temp directory: {e}")
+                print(f"   You may manually delete: {self.temp_clone_dir}")
+            finally:
+                self.temp_clone_dir = None
         
     def get_splitter_for_language(self, language: str) -> RecursiveCharacterTextSplitter:
         #Get a syntax-aware text splitter for the given language.
-        from langchain.text_splitter import Language
+        from langchain_text_splitters import Language
         
         # Map our language names to LangChain's enum
         lang_map = {
