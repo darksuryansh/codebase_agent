@@ -42,6 +42,14 @@ class CodebaseIngestor:
         parsed = urlparse(path)
         return parsed.scheme in ('http', 'https', 'git') or path.endswith('.git')
     
+    def get_repo_name_from_url(self, repo_url: str) -> str:
+        """Extract repository name from Git URL."""
+        parsed = urlparse(repo_url)
+        path = parsed.path.rstrip('/')
+        # Extract repo name (last part of path, remove .git)
+        repo_name = path.split('/')[-1].replace('.git', '')
+        return repo_name
+    
     def clone_repository(self, repo_url: str) -> Path:
         """Clone a Git repository to a temporary directory."""
         print(f"📥 Cloning repository from: {repo_url}")
@@ -242,11 +250,13 @@ def main():
         # Check if it's a Git URL or local path
         if ingestor.is_git_url(args.repo_path):
             repo_path = ingestor.clone_repository(args.repo_path)
+            repo_name = ingestor.get_repo_name_from_url(args.repo_path)
         else:
             repo_path = args.repo_path
             if not os.path.exists(repo_path):
                 print(f"❌ Local path not found: {repo_path}")
                 return
+            repo_name = Path(repo_path).name
         
         # Ingest repository
         documents = ingestor.ingest_repository(str(repo_path))
@@ -255,15 +265,16 @@ def main():
             print("❌ No documents to ingest!")
             return
         
-        # Initialize vector store and add documents
-        print("\n💾 Storing in Vector Database...")
-        vector_store = VectorStore(config_path=args.config)
+        # Initialize vector store with repo-specific index
+        print(f"\n💾 Storing in Vector Database (Index: {repo_name})...")
+        vector_store = VectorStore(config_path=args.config, index_name=repo_name)
         vector_store.add_documents(documents)
         
         print("\n" + "=" * 60)
         print("✅ Ingestion Complete!")
         print(f"📊 Total chunks stored: {len(documents)}")
-        print(f"📁 Repository: {Path(repo_path).name}")
+        print(f"📁 Repository: {repo_name}")
+        print(f"💾 Vector DB Index: {repo_name}")
         
         # Print sample
         print("\n📝 Sample chunk:")
