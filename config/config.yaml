@@ -1,0 +1,83 @@
+# File Filtering
+ignore_patterns:
+  - "node_modules/**"
+  - "__pycache__/**"
+  - "*.pyc"
+  - ".git/**"
+  - "*.lock"
+  - "package-lock.json"
+  - "yarn.lock"
+  - "dist/**"
+  - "build/**"
+  - ".vscode/**"
+  - ".idea/**"
+  - "*.min.js"
+  - "*.min.css"
+  - "*.map"
+  - "*.jpg"
+  - "*.png"
+  - "*.gif"
+  - "*.svg"
+  - "*.ico"
+  - "venv/**"
+  - "env/**"
+  - ".env"
+  - "*.log"
+
+# Allowed file extensions (code files)
+allowed_extensions:
+  - ".py"
+  - ".js"
+  - ".ts"
+  - ".jsx"
+  - ".tsx"
+  - ".java"
+  - ".cpp"
+  - ".c"
+  - ".h"
+  - ".hpp"
+  - ".cs"
+  - ".go"
+  - ".rs"
+  - ".rb"
+  - ".php"
+  - ".swift"
+  - ".kt"
+  - ".scala"
+  - ".md"
+  - ".txt"
+  - ".yaml"
+  - ".yml"
+  - ".json"  # Keep for package.json, tsconfig.json etc
+
+# Code Splitting Configuration
+chunk_size: 1500
+chunk_overlap: 200
+
+# Language-specific chunk sizes (optional overrides)
+language_chunk_sizes:
+  python: 1500
+  javascript: 1200
+  typescript: 1200
+  java: 2000
+
+# Retrieval Configuration
+top_k_results: 5
+max_retries: 3
+similarity_threshold: 0.6
+
+# LLM Configuration
+llm:
+  model: "gemini-1.5-pro"
+  temperature: 0.1
+  max_tokens: 2048
+
+# Embeddings Configuration
+embeddings:
+  model: "jinaai/jina-embeddings-v2-base-code"
+  device: "cpu"  # Use "cuda" if you have GPU
+
+# ChromaDB Configuration
+chroma:
+  persist_directory: "./data/chroma_db"
+  collection_name: "codebase_chunks"

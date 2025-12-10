@@ -1,0 +1,27 @@
+# Core Dependencies
+langchain==0.2.16
+langchain-google-genai==1.0.10
+langchain-community==0.2.16
+langgraph==0.2.16
+
+# Vector Store & Embeddings
+chromadb==0.5.5
+sentence-transformers==3.0.1
+
+# Code Processing
+tree-sitter==0.21.3
+tree-sitter-python==0.21.0
+tree-sitter-javascript==0.21.4
+
+# UI
+streamlit==1.39.0
+streamlit-chat==0.1.1
+
+# Utilities
+python-dotenv==1.0.1
+pyyaml==6.0.2
+tqdm==4.66.5
+GitPython==3.1.43
+
+# Optional: For better code highlighting in UI
+pygments==2.18.0
