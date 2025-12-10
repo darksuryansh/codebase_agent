@@ -62,5 +62,5 @@ Thumbs.db
 .cache/
 models/
 
-# Data files (optional - uncomment if you don't want to commit data)
+# Data files 
 data/repo_tree.txt

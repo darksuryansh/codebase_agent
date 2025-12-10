@@ -4,8 +4,9 @@ langchain-google-genai==1.0.10
 langchain-community==0.2.16
 langgraph==0.2.16
 
-# Vector Store & Embeddings
-chromadb==0.5.5
+# Vector Store & Embeddings  
+# Using FAISS for local vector storage
+faiss-cpu>=1.8.0
 sentence-transformers==3.0.1
 
 # Code Processing

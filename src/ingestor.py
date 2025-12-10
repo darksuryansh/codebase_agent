@@ -5,9 +5,13 @@ This module respects code structure (functions, classes) when splitting.
 
 import os
 import argparse
+import shutil
+import tempfile
 from pathlib import Path
 from typing import List
 from tqdm import tqdm
+from git import Repo
+from urllib.parse import urlparse
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
@@ -23,7 +27,7 @@ from vector_store import VectorStore
 
 
 class CodebaseIngestor:
-    
+    """Handles loading and splitting code files from a repository."""
     
     def __init__(self, config_path: str = "config/config.yaml"):
         self.config = load_config(config_path)
@@ -31,6 +35,38 @@ class CodebaseIngestor:
         self.chunk_overlap = self.config.get('chunk_overlap', 200)
         self.ignore_patterns = self.config.get('ignore_patterns', [])
         self.allowed_extensions = self.config.get('allowed_extensions', [])
+        self.temp_clone_dir = None
+    
+    def is_git_url(self, path: str) -> bool:
+        """Check if the path is a Git repository URL."""
+        parsed = urlparse(path)
+        return parsed.scheme in ('http', 'https', 'git') or path.endswith('.git')
+    
+    def clone_repository(self, repo_url: str) -> Path:
+        """Clone a Git repository to a temporary directory."""
+        print(f"📥 Cloning repository from: {repo_url}")
+        
+        # Create temp directory
+        self.temp_clone_dir = tempfile.mkdtemp(prefix='codebase_agent_')
+        temp_path = Path(self.temp_clone_dir)
+        
+        try:
+            # Clone the repository
+            Repo.clone_from(repo_url, temp_path, depth=1)  # Shallow clone for speed
+            print(f"✅ Repository cloned to: {temp_path}")
+            return temp_path
+        except Exception as e:
+            print(f"❌ Error cloning repository: {e}")
+            if self.temp_clone_dir and os.path.exists(self.temp_clone_dir):
+                shutil.rmtree(self.temp_clone_dir)
+            raise
+    
+    def cleanup_temp_clone(self):
+        """Clean up temporary cloned repository."""
+        if self.temp_clone_dir and os.path.exists(self.temp_clone_dir):
+            print(f"🧹 Cleaning up temporary clone...")
+            shutil.rmtree(self.temp_clone_dir)
+            self.temp_clone_dir = None
         
     def get_splitter_for_language(self, language: str) -> RecursiveCharacterTextSplitter:
         #Get a syntax-aware text splitter for the given language.
@@ -163,13 +199,13 @@ class CodebaseIngestor:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Ingest a codebase into the vector store"
+        description="Ingest a codebase into the vector store from a local path or Git URL"
     )
     parser.add_argument(
         '--repo_path',
         type=str,
         required=True,
-        help='Path to the repository to ingest'
+        help='Path to the repository OR Git URL (e.g., https://github.com/user/repo.git)'
     )
     parser.add_argument(
         '--config',
@@ -186,30 +222,44 @@ def main():
     # Initialize ingestor
     ingestor = CodebaseIngestor(config_path=args.config)
     
-    # Ingest repository
-    documents = ingestor.ingest_repository(args.repo_path)
+    try:
+        # Check if it's a Git URL or local path
+        if ingestor.is_git_url(args.repo_path):
+            repo_path = ingestor.clone_repository(args.repo_path)
+        else:
+            repo_path = args.repo_path
+            if not os.path.exists(repo_path):
+                print(f"❌ Local path not found: {repo_path}")
+                return
+        
+        # Ingest repository
+        documents = ingestor.ingest_repository(str(repo_path))
+        
+        if not documents:
+            print("❌ No documents to ingest!")
+            return
+        
+        # Initialize vector store and add documents
+        print("\n💾 Storing in Vector Database...")
+        vector_store = VectorStore(config_path=args.config)
+        vector_store.add_documents(documents)
+        
+        print("\n" + "=" * 60)
+        print("✅ Ingestion Complete!")
+        print(f"📊 Total chunks stored: {len(documents)}")
+        print(f"📁 Repository: {Path(repo_path).name}")
+        
+        # Print sample
+        print("\n📝 Sample chunk:")
+        print("-" * 60)
+        sample = documents[0]
+        print(f"File: {sample.metadata['file_path']}")
+        print(f"Language: {sample.metadata['language']}")
+        print(f"Content preview:\n{sample.page_content[:300]}...")
     
-    if not documents:
-        print("❌ No documents to ingest!")
-        return
-    
-    # Initialize vector store and add documents
-    print("\n💾 Storing in ChromaDB...")
-    vector_store = VectorStore(config_path=args.config)
-    vector_store.add_documents(documents)
-    
-    print("\n" + "=" * 60)
-    print("✅ Ingestion Complete!")
-    print(f"📊 Total chunks stored: {len(documents)}")
-    print(f"📁 Repository: {Path(args.repo_path).name}")
-    
-    # Print sample
-    print("\n📝 Sample chunk:")
-    print("-" * 60)
-    sample = documents[0]
-    print(f"File: {sample.metadata['file_path']}")
-    print(f"Language: {sample.metadata['language']}")
-    print(f"Content preview:\n{sample.page_content[:300]}...")
+    finally:
+        # Cleanup temporary clone if it exists
+        ingestor.cleanup_temp_clone()
 
 
 if __name__ == "__main__":

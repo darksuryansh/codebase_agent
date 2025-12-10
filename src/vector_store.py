@@ -1,29 +1,28 @@
 """
-Vector Store: ChromaDB setup with code-optimized embeddings.
+Vector Store: FAISS setup with code-optimized embeddings.
 Uses HuggingFace jina-embeddings-v2-base-code for semantic code search.
 """
 
 import os
+import pickle
 from typing import List, Dict, Optional
 from langchain.schema import Document
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
-import chromadb
-from chromadb.config import Settings
 
 from utils import load_config
 
 
 class VectorStore:
-    """Manages ChromaDB vector store for code embeddings."""
+    """Manages FAISS vector store for code embeddings."""
     
     def __init__(self, config_path: str = "config/config.yaml"):
         self.config = load_config(config_path)
         
-        # ChromaDB settings
-        chroma_config = self.config.get('chroma', {})
-        self.persist_directory = chroma_config.get('persist_directory', './data/chroma_db')
-        self.collection_name = chroma_config.get('collection_name', 'codebase_chunks')
+        # FAISS settings
+        vector_config = self.config.get('vector_store', {})
+        self.persist_directory = vector_config.get('persist_directory', './data/vector_db')
+        self.index_name = vector_config.get('index_name', 'codebase_index')
         
         # Ensure directory exists
         os.makedirs(self.persist_directory, exist_ok=True)
@@ -31,7 +30,7 @@ class VectorStore:
         # Initialize embeddings (HuggingFace code-specific model)
         self.embeddings = self._init_embeddings()
         
-        # Initialize ChromaDB
+        # Initialize or load FAISS
         self.vectorstore = self._init_vectorstore()
     
     def _init_embeddings(self):
@@ -52,24 +51,25 @@ class VectorStore:
         return embeddings
     
     def _init_vectorstore(self):
-        """Initialize ChromaDB vector store."""
-        # Create ChromaDB client with persistence
-        client = chromadb.PersistentClient(
-            path=self.persist_directory,
-            settings=Settings(
-                anonymized_telemetry=False,
-                allow_reset=True
-            )
-        )
+        """Initialize or load FAISS vector store."""
+        index_path = os.path.join(self.persist_directory, self.index_name)
         
-        # Initialize LangChain Chroma wrapper
-        vectorstore = Chroma(
-            client=client,
-            collection_name=self.collection_name,
-            embedding_function=self.embeddings,
-        )
+        # Try to load existing index
+        if os.path.exists(f"{index_path}.faiss"):
+            print(f"📂 Loading existing FAISS index from {index_path}")
+            try:
+                vectorstore = FAISS.load_local(
+                    index_path, 
+                    self.embeddings,
+                    allow_dangerous_deserialization=True
+                )
+                return vectorstore
+            except Exception as e:
+                print(f"⚠️  Could not load existing index: {e}")
+                print("Creating new index...")
         
-        return vectorstore
+        # Return None - will be created when documents are added
+        return None
     
     def add_documents(self, documents: List[Document]) -> None:
         """Add documents to the vector store."""
@@ -77,18 +77,21 @@ class VectorStore:
             print("⚠️  No documents to add")
             return
         
-        print(f"💾 Adding {len(documents)} documents to ChromaDB...")
+        print(f"💾 Adding {len(documents)} documents to FAISS...")
         
-        # Add in batches to avoid memory issues
-        batch_size = 100
-        for i in range(0, len(documents), batch_size):
-            batch = documents[i:i + batch_size]
-            self.vectorstore.add_documents(batch)
-            
-            if (i + batch_size) % 500 == 0:
-                print(f"   Processed {min(i + batch_size, len(documents))}/{len(documents)} documents")
+        # Create or update vectorstore
+        if self.vectorstore is None:
+            # Create new FAISS index
+            self.vectorstore = FAISS.from_documents(documents, self.embeddings)
+        else:
+            # Add to existing index
+            self.vectorstore.add_documents(documents)
         
-        print("✅ Documents added successfully")
+        # Save the index
+        index_path = os.path.join(self.persist_directory, self.index_name)
+        self.vectorstore.save_local(index_path)
+        
+        print("✅ Documents added and index saved successfully")
     
     def similarity_search(
         self,
@@ -139,20 +142,33 @@ class VectorStore:
         return results
     
     def delete_collection(self) -> None:
-        """Delete the entire collection (use with caution!)."""
-        print(f"⚠️  Deleting collection: {self.collection_name}")
-        self.vectorstore.delete_collection()
-        print("✅ Collection deleted")
+        """Delete the entire index (use with caution!)."""
+        print(f"⚠️  Deleting FAISS index")
+        index_path = os.path.join(self.persist_directory, self.index_name)
+        
+        # Delete index files
+        for ext in ['.faiss', '.pkl']:
+            file_path = f"{index_path}{ext}"
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        
+        self.vectorstore = None
+        print("✅ Index deleted")
     
     def get_collection_stats(self) -> Dict:
-        """Get statistics about the collection."""
+        """Get statistics about the index."""
         try:
-            collection = self.vectorstore._collection
-            count = collection.count()
+            if self.vectorstore is None:
+                return {
+                    'index_name': self.index_name,
+                    'total_documents': 0,
+                    'persist_directory': self.persist_directory,
+                }
             
+            # FAISS doesn't have a direct count, but we can estimate
             return {
-                'collection_name': self.collection_name,
-                'total_documents': count,
+                'index_name': self.index_name,
+                'total_documents': self.vectorstore.index.ntotal if hasattr(self.vectorstore, 'index') else 0,
                 'persist_directory': self.persist_directory,
             }
         except Exception as e:
