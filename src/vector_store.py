@@ -68,7 +68,7 @@ class CustomHuggingFaceEmbeddings(Embeddings):
 class VectorStore:
     """Manages FAISS vector store for code embeddings."""
     
-    def __init__(self, config_path: str = "config/config.yaml"):
+    def __init__(self, config_path: str = "config/config.yaml", index_name: str = None):
         self.config = load_config(config_path)
         
         # FAISS settings
@@ -84,8 +84,9 @@ class VectorStore:
             self.persist_directory = os.path.join(project_root, clean_path)
         else:
             self.persist_directory = persist_dir
-            
-        self.index_name = vector_config.get('index_name', 'codebase_index')
+        
+        # Allow override of index name (for repo-specific isolation)
+        self.index_name = index_name or vector_config.get('index_name', 'codebase_index')
         
         # Ensure directory exists
         os.makedirs(self.persist_directory, exist_ok=True)
