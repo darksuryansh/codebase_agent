@@ -73,7 +73,18 @@ class VectorStore:
         
         # FAISS settings
         vector_config = self.config.get('vector_store', {})
-        self.persist_directory = vector_config.get('persist_directory', './data/vector_db')
+        persist_dir = vector_config.get('persist_directory', './data/vector_db')
+        
+        # Convert to absolute path relative to project root
+        if not os.path.isabs(persist_dir):
+            # Get project root (parent of src directory)
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            # Normalize path separators
+            clean_path = persist_dir.lstrip('./').replace('/', os.sep)
+            self.persist_directory = os.path.join(project_root, clean_path)
+        else:
+            self.persist_directory = persist_dir
+            
         self.index_name = vector_config.get('index_name', 'codebase_index')
         
         # Ensure directory exists
@@ -102,9 +113,13 @@ class VectorStore:
     def _init_vectorstore(self):
         """Initialize or load FAISS vector store."""
         index_path = os.path.join(self.persist_directory, self.index_name)
+        index_file = os.path.join(index_path, "index.faiss")
         
-        # Try to load existing index
-        if os.path.exists(f"{index_path}.faiss"):
+        print(f"🔍 Checking for FAISS index at: {index_path}")
+        print(f"   Looking for file: {index_file}")
+        
+        # Try to load existing index (check for the actual index.faiss file)
+        if os.path.exists(index_file):
             print(f"📂 Loading existing FAISS index from {index_path}")
             try:
                 vectorstore = FAISS.load_local(
@@ -112,10 +127,15 @@ class VectorStore:
                     self.embeddings,
                     allow_dangerous_deserialization=True
                 )
+                print(f"✅ Successfully loaded index with {vectorstore.index.ntotal} vectors")
                 return vectorstore
             except Exception as e:
                 print(f"⚠️  Could not load existing index: {e}")
+                import traceback
+                traceback.print_exc()
                 print("Creating new index...")
+        else:
+            print(f"❌ Index file not found: {index_file}")
         
         # Return None - will be created when documents are added
         return None
