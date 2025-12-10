@@ -31,9 +31,9 @@ class AgentState(TypedDict):
 class CodebaseAgent:
     #LangGraph-based agent for codebase Q&A.
     
-    def __init__(self, config_path: str = "config/config.yaml"):
+    def __init__(self, config_path: str = "config/config.yaml", index_name: str = None):
         self.config = load_config(config_path)
-        self.vector_store = VectorStore(config_path)
+        self.vector_store = VectorStore(config_path, index_name=index_name)
         self.max_retries = self.config.get('max_retries', 3)
         
         # Initialize Gemini LLM

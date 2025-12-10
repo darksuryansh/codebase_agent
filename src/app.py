@@ -55,9 +55,23 @@ st.markdown("""
 
 
 @st.cache_resource
-def load_agent():
-    """Load agent (cached to avoid reloading)."""
-    return CodebaseAgent()
+def load_agent(index_name: str = None):
+    """Load agent with specific index (cached to avoid reloading)."""
+    return CodebaseAgent(index_name=index_name)
+
+
+def get_available_indexes():
+    """Get list of available vector store indexes."""
+    import os
+    vector_db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'vector_db')
+    if not os.path.exists(vector_db_path):
+        return []
+    
+    # List all directories in vector_db folder
+    indexes = [d for d in os.listdir(vector_db_path) 
+               if os.path.isdir(os.path.join(vector_db_path, d)) and 
+               os.path.exists(os.path.join(vector_db_path, d, 'index.faiss'))]
+    return indexes
 
 
 def syntax_highlight(code: str, language: str) -> str:
@@ -98,18 +112,34 @@ def main():
     with st.sidebar:
         st.header("📊 System Info")
         
-        # Load agent and get stats
+        # Get available indexes
+        available_indexes = get_available_indexes()
+        
+        if not available_indexes:
+            st.error("⚠️ No repositories ingested! Run `python src/ingestor.py --repo_path <repo-url>` first.")
+            return
+        
+        # Repo selector
+        st.subheader("🔍 Select Repository")
+        selected_index = st.selectbox(
+            "Choose a repository:",
+            available_indexes,
+            help="Each ingested repository has its own isolated index"
+        )
+        
+        # Load agent with selected index
         try:
-            agent = load_agent()
+            agent = load_agent(index_name=selected_index)
             stats = agent.vector_store.get_collection_stats()
             
+            st.divider()
             st.metric("Total Code Chunks", stats.get('total_documents', 0))
-            st.metric("Collection", stats.get('collection_name', 'N/A'))
+            st.metric("Active Repository", selected_index)
             
             if stats.get('total_documents', 0) == 0:
-                st.error("⚠️ No codebase ingested! Run `python src/ingestor.py --repo_path /path/to/repo` first.")
+                st.warning("⚠️ This index appears empty.")
             else:
-                st.success("✅ Codebase loaded")
+                st.success("✅ Repository loaded")
         
         except Exception as e:
             st.error(f"❌ Error loading agent: {e}")
