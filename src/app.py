@@ -248,8 +248,8 @@ def main():
     with col_b:
         st.markdown("**Powered by:** Gemini Pro + LangGraph")
     
-    with col_c:
-        st.markdown("**Embeddings:** Jina Code v2")
+    # with col_c:
+    #     st.markdown("**Embeddings:** Jina Code v2")
 
 
 if __name__ == "__main__":

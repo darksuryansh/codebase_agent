@@ -15,10 +15,9 @@ from utils import load_config
 
 
 class CustomHuggingFaceEmbeddings(Embeddings):
-    """Custom embeddings wrapper using sentence_transformers directly.
+    #Custom embeddings wrapper using sentence_transformers directly.
     
-    This avoids the TensorFlow DLL loading issues with langchain_huggingface.
-    """
+    
     
     def __init__(self, model_name: str, device: str = 'cpu'):
         """Initialize the embeddings model.

@@ -1,15 +1,11 @@
 # Core Dependencies
-langchain==0.2.16
-langchain-google-genai==1.0.10
-langchain-community==0.2.16
-langgraph==0.2.16
-
-# Vector Store & Embeddings  
-# Using FAISS for local vector storage
+langchain>=1.1.0
+langchain-google-genai>=4.0.0
+langchain-community>=0.4.0
+langgraph>=1.0.0
 faiss-cpu>=1.8.0
-sentence-transformers==3.0.1
-
-# Code Processing
+langchain-huggingface>=1.1.0  
+sentence-transformers>=3.0.0  
 tree-sitter==0.21.3
 tree-sitter-python==0.21.0
 tree-sitter-javascript==0.21.4
@@ -23,6 +19,4 @@ python-dotenv==1.0.1
 pyyaml==6.0.2
 tqdm==4.66.5
 GitPython==3.1.43
-
-# Optional: For better code highlighting in UI
 pygments==2.18.0
