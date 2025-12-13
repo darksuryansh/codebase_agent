@@ -103,6 +103,30 @@ def display_source(source: dict, index: int):
     st.code(content, language=language, line_numbers=False)
 
 
+def ingest_repository(repo_url: str):
+    """Ingest a repository from URL."""
+    import subprocess
+    import sys
+    
+    try:
+        # Run the ingestor script
+        result = subprocess.run(
+            [sys.executable, "src/ingestor.py", "--repo_path", repo_url],
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minute timeout
+        )
+        
+        if result.returncode == 0:
+            return True, "✅ Repository ingested successfully!"
+        else:
+            return False, f"❌ Error: {result.stderr}"
+    except subprocess.TimeoutExpired:
+        return False, "❌ Ingestion timed out (>10 minutes)"
+    except Exception as e:
+        return False, f"❌ Error: {str(e)}"
+
+
 def main():
     # Header
     st.markdown('<h1 class="main-header">🤖 Codebase Onboarding Agent</h1>', unsafe_allow_html=True)
@@ -112,11 +136,33 @@ def main():
     with st.sidebar:
         st.header("📊 System Info")
         
+        # Add new repository section
+        st.subheader("➕ Add Repository")
+        with st.form("ingest_form"):
+            repo_url = st.text_input(
+                "Git Repository URL",
+                placeholder="https://github.com/username/repo.git",
+                help="Enter a GitHub/GitLab repository URL to ingest"
+            )
+            submit_button = st.form_submit_button("🚀 Ingest Repository")
+            
+            if submit_button and repo_url:
+                with st.spinner("🔄 Cloning and processing repository... This may take a few minutes."):
+                    success, message = ingest_repository(repo_url)
+                    if success:
+                        st.success(message)
+                        st.info("🔄 Refreshing page to load new repository...")
+                        st.rerun()
+                    else:
+                        st.error(message)
+        
+        st.divider()
+        
         # Get available indexes
         available_indexes = get_available_indexes()
         
         if not available_indexes:
-            st.error("⚠️ No repositories ingested! Run `python src/ingestor.py --repo_path <repo-url>` first.")
+            st.warning("⚠️ No repositories ingested yet. Add one above!")
             return
         
         # Repo selector
